@@ -28,7 +28,7 @@ import Data.List
 --  maxBy head   [1,2,3] [4,5]  ==>  [4,5]
 
 maxBy :: (a -> Int) -> a -> a -> a
-maxBy measure a b = todo
+maxBy measure a b = if measure a >= measure b then a else b
 
 ------------------------------------------------------------------------------
 -- Ex 2: implement the function mapMaybe that takes a function and a
@@ -40,7 +40,8 @@ maxBy measure a b = todo
 --   mapMaybe length (Just "abc") ==> Just 3
 
 mapMaybe :: (a -> b) -> Maybe a -> Maybe b
-mapMaybe f x = todo
+mapMaybe f Nothing = Nothing
+mapMaybe f (Just a)  = Just (f a)
 
 ------------------------------------------------------------------------------
 -- Ex 3: implement the function mapMaybe2 that works like mapMaybe
@@ -54,7 +55,9 @@ mapMaybe f x = todo
 --   mapMaybe2 div (Just 6) Nothing   ==>  Nothing
 
 mapMaybe2 :: (a -> b -> c) -> Maybe a -> Maybe b -> Maybe c
-mapMaybe2 f x y = todo
+mapMaybe2 f Nothing _ = Nothing
+mapMaybe2 f _ Nothing = Nothing
+mapMaybe2 f (Just a) (Just b) = Just (f a b)
 
 ------------------------------------------------------------------------------
 -- Ex 4: define the functions firstHalf and palindrome so that
@@ -76,9 +79,11 @@ mapMaybe2 f x y = todo
 palindromeHalfs :: [String] -> [String]
 palindromeHalfs xs = map firstHalf (filter palindrome xs)
 
-firstHalf = todo
+firstHalf :: String -> String
+firstHalf s = take (div (n+1) 2) s where n = length s
 
-palindrome = todo
+palindrome :: String -> Bool
+palindrome s = reverse s == s
 
 ------------------------------------------------------------------------------
 -- Ex 5: Implement a function capitalize that takes in a string and
@@ -96,7 +101,10 @@ palindrome = todo
 --   capitalize "goodbye cruel world" ==> "Goodbye Cruel World"
 
 capitalize :: String -> String
-capitalize = todo
+capitalize s = unwords (map capitalizeFirst (words s))
+
+capitalizeFirst :: String -> String
+capitalizeFirst w = toUpper (head w) : tail w
 
 ------------------------------------------------------------------------------
 -- Ex 6: powers k max should return all the powers of k that are less
@@ -113,7 +121,7 @@ capitalize = todo
 --   * the function takeWhile
 
 powers :: Int -> Int -> [Int]
-powers k max = todo
+powers k max = takeWhile (\a -> a <= max) [k^i | i <- [0..max]]
 
 ------------------------------------------------------------------------------
 -- Ex 7: implement a functional while loop. While should be a function
@@ -136,7 +144,10 @@ powers k max = todo
 --     ==> Avvt
 
 while :: (a->Bool) -> (a->a) -> a -> a
-while check update value = todo
+while check update value = if (check value) == False
+                           then value
+                           else while check update (update value)
+
 
 ------------------------------------------------------------------------------
 -- Ex 8: another version of a while loop. This time, the check
@@ -153,7 +164,11 @@ while check update value = todo
 --   whileRight (step 1000) 3  ==> 1536
 
 whileRight :: (a -> Either b a) -> a -> b
-whileRight f x = todo
+whileRight f x = whileRight' f (f x)
+
+whileRight' :: (a -> Either b a) -> Either b a -> b
+whileRight' _ (Left x)    = x
+whileRight' f (Right x)   = whileRight' f (f x)
 
 -- for the whileRight examples:
 -- step k x doubles x if it's less than k
@@ -172,7 +187,7 @@ step k x = if x<k then Right (2*x) else Left x
 -- Hint! This is a great use for list comprehensions
 
 joinToLength :: Int -> [String] -> [String]
-joinToLength = todo
+joinToLength l s = [x | a <- s, b <- s, let x = a ++ b, length x == l]
 
 ------------------------------------------------------------------------------
 -- Ex 10: implement the operator +|+ that returns a list with the first
@@ -186,6 +201,8 @@ joinToLength = todo
 --   [] +|+ [True]        ==> [True]
 --   [] +|+ []            ==> []
 
+(+|+) :: [a] -> [a] -> [a]
+x +|+ y = map head $ filter (not . null) [x,y]
 
 ------------------------------------------------------------------------------
 -- Ex 11: remember the lectureParticipants example from Lecture 2? We
@@ -202,7 +219,12 @@ joinToLength = todo
 --   sumRights [Left "bad!", Left "missing"]         ==>  0
 
 sumRights :: [Either a Int] -> Int
-sumRights = todo
+sumRights [] = 0
+sumRights (x:xs) = get x + sumRights xs
+
+get :: Either a Int -> Int
+get (Left x)    = 0
+get (Right x)   = x
 
 ------------------------------------------------------------------------------
 -- Ex 12: recall the binary function composition operation
@@ -218,7 +240,12 @@ sumRights = todo
 --   multiCompose [(3*), (2^), (+1)] 0 ==> 6
 --   multiCompose [(+1), (2^), (3*)] 0 ==> 2
 
-multiCompose fs = todo
+multiCompose :: [(a -> a)] -> a -> a
+multiCompose fs x = multiCompose' (reverse fs) x
+
+multiCompose' :: [(a -> a)] -> a -> a
+multiCompose' [] x         = x
+multiCompose' (f:fs) x     = multiCompose' fs (f x)
 
 ------------------------------------------------------------------------------
 -- Ex 13: let's consider another way to compose multiple functions. Given
@@ -237,7 +264,8 @@ multiCompose fs = todo
 --   multiApp reverse [tail, take 2, reverse] "foo" ==> ["oof","fo","oo"]
 --   multiApp concat [take 3, reverse] "race" ==> "racecar"
 
-multiApp = todo
+multiApp :: ([a] -> b) -> [(c -> a)] -> c -> b
+multiApp f gs s = f (map (\x -> x s) gs)
 
 ------------------------------------------------------------------------------
 -- Ex 14: in this exercise you get to implement an interpreter for a
@@ -272,4 +300,29 @@ multiApp = todo
 -- function, the surprise won't work.
 
 interpreter :: [String] -> [String]
-interpreter commands = todo
+interpreter commands = interpret 0 0 commands
+
+interpret :: Int -> Int -> [String] -> [String]
+interpret _ _ [] = []
+interpret x y commands = evalPrint sX sY (head dW) : interpret sX sY (drop 1 dW)
+                            where l = takeWhile direction commands
+                                  dW = dropWhile direction commands
+                                  sX = sum (map conX l) + x
+                                  sY = sum (map conY l) + y
+
+conX :: String -> Int
+conX dir = case dir of "left" -> -1
+                       "right" -> 1
+                       dir -> 0
+
+conY :: String -> Int
+conY dir = case dir of "up" -> 1
+                       "down" -> -1
+                       dir -> 0
+
+direction :: String -> Bool
+direction s = elem s ["up", "down", "left", "right"]
+
+evalPrint :: Int -> Int -> String -> String
+evalPrint x _ "printX" = show x
+evalPrint _ y "printY" = show y
