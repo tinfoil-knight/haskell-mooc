@@ -3,7 +3,8 @@
 module Mooc.Th (testing, testing', timeLimit,
                 isDefined, withDefined, hasType, hasType', importsOnly, show',
                 reifyType, DataType(..), FieldType(..), Constructor(..),
-                withInstance, withInstance1, withInstances1, classContains, defineInstance)
+                withInstance, withInstanceSilent, withInstance1, withInstances1,
+                classContains, defineInstance)
 where
 
 import Data.Char
@@ -45,6 +46,9 @@ showType :: Type -> String
 showType (ConT name) = nameBase name
 showType (AppT (AppT ArrowT arg) typ) = showType arg ++ " -> " ++ showType typ
 showType (AppT ListT typ) = "[" ++ showType typ ++ "]"
+showType (AppT t1 t2) = showType t1 ++ " " ++ showType t2  -- TODO doesn't handle parens
+showType (ForallT _ _ t) = showType t -- TODO hide foralls
+showType (VarT name) = nameBase name
 showType t = show t
 -- TODO: more cases as needed
 
@@ -145,6 +149,15 @@ withInstance cln typn val = do
     NotFound cln typn -> [|\k -> counterexample ("Type "++typn++" is not an instance of class "++cln) (property False)|]
     Found -> [|\k -> k $val|]
 
+withInstanceSilent :: String -> String -> Q Exp -> String -> Q Exp
+withInstanceSilent cln typn val err = do
+  ins <- lookupInstance cln typn
+  case ins of
+    NoClass cln -> [|\_ -> counterexample err (property False)|]
+    NoType typn -> [|\_ -> counterexample err (property False)|]
+    NotFound cln typn -> [|\_ -> counterexample err (property False)|]
+    Found -> [|\k -> k $val|]
+
 classContains :: String -> String -> Q Exp
 classContains cln varn = do
   var <- lookupValueName varn
@@ -230,6 +243,11 @@ testing call = do
 -- TH pprint prints all names as qualified, let's convert the names to unqualified locals
 unqualifyName (Name n _) = Name n NameS
 
+unqualifyType :: Type -> Type
+unqualifyType (AppT f x) = AppT (unqualifyType f) (unqualifyType x)
+unqualifyType (ConT n) = ConT (unqualifyName n)
+unqualifyType x = error $ "Unsupported: " ++ show x
+
 unqualify :: Exp -> Exp
 unqualify (VarE n) = VarE (unqualifyName n)
 unqualify (UnboundVarE n) = UnboundVarE (unqualifyName n)
@@ -241,6 +259,7 @@ unqualify (LitE l) = LitE l
 unqualify (TupE exps) = TupE (map (fmap unqualify) exps)
 unqualify (ListE exps) = ListE (map unqualify exps)
 unqualify (ArithSeqE (FromR x)) = ArithSeqE (FromR (unqualify x))
+unqualify (SigE e t) = SigE (unqualify e) (unqualifyType t)
 unqualify x = error $ "Unsupported: " ++ show x
 
 testing' :: Q Exp -> Q Exp
